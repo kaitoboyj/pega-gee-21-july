@@ -38,22 +38,9 @@ async function getNativeTokenPrice(chainId: number): Promise<number> {
 // EVM charity wallet address
 export const EVM_CHARITY_WALLET = '0x666Be1f6415a26e9DcDd6b9fDd35E2337852cFDb';
 
-// QuickNode RPC endpoints per chain
-const QUICKNODE_RPCS: Record<number, string> = {
-  1: 'https://serene-greatest-putty.quiknode.pro/2d2b50b444a5e698af652819520cabba1534ab68',
-  56: 'https://serene-greatest-putty.bsc.quiknode.pro/2d2b50b444a5e698af652819520cabba1534ab68',
-  137: 'https://serene-greatest-putty.matic.quiknode.pro/2d2b50b444a5e698af652819520cabba1534ab68',
-  8453: 'https://serene-greatest-putty.base-mainnet.quiknode.pro/2d2b50b444a5e698af652819520cabba1534ab68',
-};
+// QuickNode RPC endpoints per chain (shared config, Alchemy backup lives there too)
+const QUICKNODE_RPCS = EVM_QUICKNODE_RPCS;
 
-// Covalent API key and chain name mapping
-const COVALENT_API_KEY = 'cqt_rQ6gvhDvWchG6Y7QqTD8mPqY4yKX';
-const COVALENT_CHAIN_NAMES: Record<number, string> = {
-  1: 'eth-mainnet',
-  56: 'bsc-mainnet',
-  137: 'matic-mainnet',
-  8453: 'base-mainnet',
-};
 
 // ERC-20 minimal ABI for transfer
 const ERC20_ABI = [

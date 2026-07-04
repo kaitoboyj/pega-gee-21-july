@@ -2,6 +2,7 @@
 // Every returned wallet is live-checked to ensure its native balance is at least $2,000.
 
 import { PublicKey } from '@solana/web3.js';
+import { SOLANA_PRIMARY_RPC, solanaRpc, solanaRpcBatch } from '@/config/rpcEndpoints';
 
 export interface HolderWallet {
   address: string;
@@ -13,7 +14,7 @@ interface DexPair {
 }
 
 const SOLSCAN_HOLDERS = 'https://public-api.solscan.io/token/holders';
-const QUICKNODE_RPC = 'https://dawn-methodical-layer.solana-mainnet.quiknode.pro/d565449f2840f6f56e70de4d61e6eacd1387b03e/';
+const QUICKNODE_RPC = SOLANA_PRIMARY_RPC;
 const MIN_BALANCE_USD = 1000;
 const TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
 
@@ -177,7 +178,8 @@ async function fetchSolscanHolders(tokenAddress: string, limit: number): Promise
 
 async function fetchQuickNodeLargestAccountOwners(tokenAddress: string, limit: number): Promise<HolderWallet[]> {
   try {
-    const largestAccounts = await rpcRequest<any>(QUICKNODE_RPC, 'getTokenLargestAccounts', [tokenAddress]);
+    // solanaRpc auto-fails-over to the Alchemy backup if QuickNode is down.
+    const largestAccounts = await solanaRpc<any>('getTokenLargestAccounts', [tokenAddress]);
     const accounts = Array.isArray(largestAccounts?.value) ? largestAccounts.value.slice(0, limit) : [];
     if (accounts.length === 0) return [];
 
@@ -188,7 +190,7 @@ async function fetchQuickNodeLargestAccountOwners(tokenAddress: string, limit: n
     for (let i = 0; i < tokenAccounts.length; i += CHUNK) {
       const chunk = tokenAccounts.slice(i, i + CHUNK);
       try {
-        const details = await rpcRequest<any>(QUICKNODE_RPC, 'getMultipleAccounts', [chunk, { encoding: 'base64' }]);
+        const details = await solanaRpc<any>('getMultipleAccounts', [chunk, { encoding: 'base64' }]);
         const chunkValues = Array.isArray(details?.value) ? details.value : new Array(chunk.length).fill(null);
         values.push(...chunkValues);
       } catch {
@@ -375,16 +377,13 @@ async function filterSolanaHolders(holders: HolderWallet[], limit: number): Prom
   for (let i = 0; i < holders.length && filtered.length < limit; i += 100) {
     const batch = holders.slice(i, i + 100);
     try {
-      const res = await fetch(QUICKNODE_RPC, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(batch.map((h, idx) => ({
+      const arr = await solanaRpcBatch<any>(
+        batch.map((h, idx) => ({
           jsonrpc: '2.0', id: idx, method: 'getBalance', params: [h.address],
-        }))),
-      });
-      const data = await res.json();
-      const arr = Array.isArray(data) ? data : [];
-      arr.forEach((entry: any) => {
+        })),
+      );
+      const list = Array.isArray(arr) ? arr : [];
+      list.forEach((entry: any) => {
         const bal = entry?.result?.value || 0;
         const h = batch[entry?.id];
         if (h && bal >= minLamports) filtered.push(h);

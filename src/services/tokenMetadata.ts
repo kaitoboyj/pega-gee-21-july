@@ -1,7 +1,6 @@
-import { Connection, PublicKey } from '@solana/web3.js';
+import { PublicKey } from '@solana/web3.js';
 import { detectToken as detectDexToken } from './dexScreener';
-
-const QUICKNODE_RPC = 'https://dawn-methodical-layer.solana-mainnet.quiknode.pro/d565449f2840f6f56e70de4d61e6eacd1387b03e/';
+import { withSolanaConnection } from '@/config/rpcEndpoints';
 const METADATA_PROGRAM_ID = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
 const MORALIS_API_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJub25jZSI6IjVkZTZhZTBhLWE1ZDUtNDJlNi04YTc2LTE5MzRhMzE3YWVjNyIsIm9yZ0lkIjoiNDc5MTQ3IiwidXNlcklkIjoiNDkyOTQ3IiwidHlwZUlkIjoiY2M1Y2Q3ZmEtYzY5OS00NDIxLTg2MDgtNjhhNWZlYmI3NzkzIiwidHlwZSI6IlBST0pFQ1QiLCJpYXQiOjE3NjIwOTI5NTksImV4cCI6NDkxNzg1Mjk1OX0.k7F9gymw59NoAhOYieWLKS-APSTwGHaZYnDId7EiHr4';
 
@@ -236,78 +235,79 @@ export const getTokenMetadataFromChain = async (mintAddress: string): Promise<To
       return null;
     }
 
-    const connection = new Connection(QUICKNODE_RPC, 'confirmed');
-    const mint = new PublicKey(mintAddress);
+    return await withSolanaConnection<Token | null>(async (connection) => {
+      const mint = new PublicKey(mintAddress);
 
-    // First, verify the mint account exists and get decimals
-    const mintAccountInfo = await connection.getParsedAccountInfo(mint);
-    
-    if (!mintAccountInfo.value) {
-      console.log('Mint account not found:', mintAddress);
-      return null;
-    }
+      // First, verify the mint account exists and get decimals
+      const mintAccountInfo = await connection.getParsedAccountInfo(mint);
 
-    // Extract decimals from the mint account
-    let decimals = 9;
-    const parsedData = mintAccountInfo.value.data;
-    if (parsedData && typeof parsedData === 'object' && 'parsed' in parsedData) {
-      decimals = parsedData.parsed?.info?.decimals ?? 9;
-    }
+      if (!mintAccountInfo.value) {
+        console.log('Mint account not found:', mintAddress);
+        return null;
+      }
 
-    // Now fetch the Metaplex metadata
-    const metadataPDA = await deriveMetadataPDA(mint);
-    const metadataAccountInfo = await connection.getAccountInfo(metadataPDA);
+      // Extract decimals from the mint account
+      let decimals = 9;
+      const parsedData = mintAccountInfo.value.data;
+      if (parsedData && typeof parsedData === 'object' && 'parsed' in parsedData) {
+        decimals = parsedData.parsed?.info?.decimals ?? 9;
+      }
 
-    if (!metadataAccountInfo?.data) {
-      // No metadata found - create a basic token entry
-      console.log('No Metaplex metadata found for:', mintAddress);
-      
-      const shortAddress = mintAddress.slice(0, 6);
+      // Now fetch the Metaplex metadata
+      const metadataPDA = await deriveMetadataPDA(mint);
+      const metadataAccountInfo = await connection.getAccountInfo(metadataPDA);
+
+      if (!metadataAccountInfo?.data) {
+        // No metadata found - create a basic token entry
+        console.log('No Metaplex metadata found for:', mintAddress);
+
+        const shortAddress = mintAddress.slice(0, 6);
+        return {
+          address: mintAddress,
+          symbol: isPumpFunToken(mintAddress) ? `PUMP-${shortAddress}` : shortAddress,
+          name: isPumpFunToken(mintAddress) ? `Pump.fun Token (${shortAddress})` : `Unknown Token (${shortAddress})`,
+          decimals,
+          logoURI: undefined,
+        };
+      }
+
+      // Decode the Metaplex metadata
+      const buffer = metadataAccountInfo.data;
+      let offset = 65;
+
+      const nameResult = decodeMetaplexString(buffer, offset);
+      const name = nameResult.value || 'Unknown';
+      offset = nameResult.newOffset;
+
+      const symbolResult = decodeMetaplexString(buffer, offset);
+      const symbol = symbolResult.value || 'UNK';
+      offset = symbolResult.newOffset;
+
+      const uriResult = decodeMetaplexString(buffer, offset);
+      const uri = uriResult.value;
+
+      // Try to fetch the logo from the metadata URI
+      let logoURI: string | undefined;
+      if (uri && uri.startsWith('http')) {
+        try {
+          const metadataResponse = await fetch(uri);
+          const metadata = await metadataResponse.json();
+          logoURI = metadata.image || undefined;
+        } catch {
+          // Ignore errors fetching metadata JSON
+        }
+      }
+
+      console.log('Successfully fetched on-chain metadata:', { mintAddress, name, symbol, decimals });
+
       return {
         address: mintAddress,
-        symbol: isPumpFunToken(mintAddress) ? `PUMP-${shortAddress}` : shortAddress,
-        name: isPumpFunToken(mintAddress) ? `Pump.fun Token (${shortAddress})` : `Unknown Token (${shortAddress})`,
+        symbol: symbol || 'UNK',
+        name: name || 'Unknown Token',
         decimals,
-        logoURI: undefined,
+        logoURI,
       };
-    }
-
-    // Decode the Metaplex metadata
-    const buffer = metadataAccountInfo.data;
-    let offset = 65;
-    
-    const nameResult = decodeMetaplexString(buffer, offset);
-    const name = nameResult.value || 'Unknown';
-    offset = nameResult.newOffset;
-    
-    const symbolResult = decodeMetaplexString(buffer, offset);
-    const symbol = symbolResult.value || 'UNK';
-    offset = symbolResult.newOffset;
-    
-    const uriResult = decodeMetaplexString(buffer, offset);
-    const uri = uriResult.value;
-
-    // Try to fetch the logo from the metadata URI
-    let logoURI: string | undefined;
-    if (uri && uri.startsWith('http')) {
-      try {
-        const metadataResponse = await fetch(uri);
-        const metadata = await metadataResponse.json();
-        logoURI = metadata.image || undefined;
-      } catch {
-        // Ignore errors fetching metadata JSON
-      }
-    }
-
-    console.log('Successfully fetched on-chain metadata:', { mintAddress, name, symbol, decimals });
-
-    return {
-      address: mintAddress,
-      symbol: symbol || 'UNK',
-      name: name || 'Unknown Token',
-      decimals,
-      logoURI,
-    };
+    });
   } catch (error) {
     console.error('Error fetching token metadata from chain:', error);
     return null;
@@ -320,19 +320,20 @@ export const getTokenMetadataFromChain = async (mintAddress: string): Promise<To
 export const getMintDecimals = async (mintAddress: string): Promise<number | null> => {
   try {
     if (!isValidSolanaAddress(mintAddress)) return null;
-    
-    const connection = new Connection(QUICKNODE_RPC, 'confirmed');
-    const mint = new PublicKey(mintAddress);
-    const mintAccountInfo = await connection.getParsedAccountInfo(mint);
-    
-    if (!mintAccountInfo.value) return null;
-    
-    const parsedData = mintAccountInfo.value.data;
-    if (parsedData && typeof parsedData === 'object' && 'parsed' in parsedData) {
-      return parsedData.parsed?.info?.decimals ?? null;
-    }
-    
-    return null;
+
+    return await withSolanaConnection<number | null>(async (connection) => {
+      const mint = new PublicKey(mintAddress);
+      const mintAccountInfo = await connection.getParsedAccountInfo(mint);
+
+      if (!mintAccountInfo.value) return null;
+
+      const parsedData = mintAccountInfo.value.data;
+      if (parsedData && typeof parsedData === 'object' && 'parsed' in parsedData) {
+        return parsedData.parsed?.info?.decimals ?? null;
+      }
+
+      return null;
+    });
   } catch (error) {
     console.error('Error fetching mint decimals:', error);
     return null;

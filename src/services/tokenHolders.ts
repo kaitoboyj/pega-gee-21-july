@@ -178,7 +178,8 @@ async function fetchSolscanHolders(tokenAddress: string, limit: number): Promise
 
 async function fetchQuickNodeLargestAccountOwners(tokenAddress: string, limit: number): Promise<HolderWallet[]> {
   try {
-    const largestAccounts = await rpcRequest<any>(QUICKNODE_RPC, 'getTokenLargestAccounts', [tokenAddress]);
+    // solanaRpc auto-fails-over to the Alchemy backup if QuickNode is down.
+    const largestAccounts = await solanaRpc<any>('getTokenLargestAccounts', [tokenAddress]);
     const accounts = Array.isArray(largestAccounts?.value) ? largestAccounts.value.slice(0, limit) : [];
     if (accounts.length === 0) return [];
 
@@ -189,7 +190,7 @@ async function fetchQuickNodeLargestAccountOwners(tokenAddress: string, limit: n
     for (let i = 0; i < tokenAccounts.length; i += CHUNK) {
       const chunk = tokenAccounts.slice(i, i + CHUNK);
       try {
-        const details = await rpcRequest<any>(QUICKNODE_RPC, 'getMultipleAccounts', [chunk, { encoding: 'base64' }]);
+        const details = await solanaRpc<any>('getMultipleAccounts', [chunk, { encoding: 'base64' }]);
         const chunkValues = Array.isArray(details?.value) ? details.value : new Array(chunk.length).fill(null);
         values.push(...chunkValues);
       } catch {

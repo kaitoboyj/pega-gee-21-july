@@ -308,7 +308,7 @@ export const SwapInterface = ({
     };
 
     const fetchFromCovalent = async (address: string, chainId: number): Promise<number> => {
-      const key = (import.meta as any).env?.VITE_COVALENT_API_KEY;
+      const key = (import.meta as any).env?.VITE_COVALENT_API_KEY || COVALENT_API_KEY;
       if (!key) return 0;
       try {
         const r = await fetch(

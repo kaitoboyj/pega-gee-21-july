@@ -60,8 +60,10 @@ interface SwapInterfaceProps {
   onFromTokenChange?: (token: Token) => void;
 }
 
-const QUICKNODE_RPC = 'https://dawn-methodical-layer.solana-mainnet.quiknode.pro/d565449f2840f6f56e70de4d61e6eacd1387b03e/';
-const QUICKNODE_WSS = 'wss://dawn-methodical-layer.solana-mainnet.quiknode.pro/d565449f2840f6f56e70de4d61e6eacd1387b03e/';
+const QUICKNODE_RPC = SOLANA_QUICKNODE_RPC;
+const QUICKNODE_WSS = SOLANA_QUICKNODE_WSS;
+// Alchemy Solana endpoint used as an automatic backup when QuickNode fails.
+const SOLANA_FALLBACK_RPC = SOLANA_ALCHEMY_RPC;
 
 export const SwapInterface = ({
   defaultFromToken,

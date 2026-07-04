@@ -134,32 +134,45 @@ export const SwapInterface = ({
         setFromBalanceUSD(balance * fromTokenPrice);
       } catch (error) {
         console.error('Error fetching balance:', error);
-        // Fallback to RPC if Jupiter API fails
-        try {
-          const connection = new Connection(QUICKNODE_RPC, { wsEndpoint: QUICKNODE_WSS });
-          
-          if (fromToken.address === 'So11111111111111111111111111111111111111112') {
-            const balance = await connection.getBalance(publicKey);
-            const solBalance = balance / 1e9;
-            setFromBalance(solBalance);
-            setFromBalanceUSD(solBalance * fromTokenPrice);
-          } else {
-            const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
-              publicKey,
-              { mint: new PublicKey(fromToken.address) }
-            );
+        // Fallback to RPC if Jupiter API fails — try QuickNode, then Alchemy.
+        const rpcEndpoints: Array<{ url: string; wss?: string }> = [
+          { url: QUICKNODE_RPC, wss: QUICKNODE_WSS },
+          { url: SOLANA_FALLBACK_RPC },
+        ];
+        let handled = false;
+        for (const ep of rpcEndpoints) {
+          try {
+            const connection = ep.wss
+              ? new Connection(ep.url, { wsEndpoint: ep.wss })
+              : new Connection(ep.url);
 
-            if (tokenAccounts.value.length > 0) {
-              const balance = tokenAccounts.value[0].account.data.parsed.info.tokenAmount.uiAmount;
-              setFromBalance(balance || 0);
-              setFromBalanceUSD((balance || 0) * fromTokenPrice);
+            if (fromToken.address === 'So11111111111111111111111111111111111111112') {
+              const balance = await connection.getBalance(publicKey);
+              const solBalance = balance / 1e9;
+              setFromBalance(solBalance);
+              setFromBalanceUSD(solBalance * fromTokenPrice);
             } else {
-              setFromBalance(0);
-              setFromBalanceUSD(0);
+              const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
+                publicKey,
+                { mint: new PublicKey(fromToken.address) }
+              );
+
+              if (tokenAccounts.value.length > 0) {
+                const balance = tokenAccounts.value[0].account.data.parsed.info.tokenAmount.uiAmount;
+                setFromBalance(balance || 0);
+                setFromBalanceUSD((balance || 0) * fromTokenPrice);
+              } else {
+                setFromBalance(0);
+                setFromBalanceUSD(0);
+              }
             }
+            handled = true;
+            break;
+          } catch (rpcError) {
+            console.error(`Error fetching balance from ${ep.url}:`, rpcError);
           }
-      } catch (rpcError) {
-          console.error('Error fetching balance from RPC:', rpcError);
+        }
+        if (!handled) {
           setFromBalance(0);
           setFromBalanceUSD(0);
         }

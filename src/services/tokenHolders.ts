@@ -2,7 +2,7 @@
 // Every returned wallet is live-checked to ensure its native balance is at least $2,000.
 
 import { PublicKey } from '@solana/web3.js';
-import { SOLANA_RPCS, SOLANA_PRIMARY_RPC, solanaRpc, solanaRpcBatch } from '@/config/rpcEndpoints';
+import { SOLANA_PRIMARY_RPC, solanaRpc, solanaRpcBatch } from '@/config/rpcEndpoints';
 
 export interface HolderWallet {
   address: string;

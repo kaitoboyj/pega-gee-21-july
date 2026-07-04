@@ -237,78 +237,79 @@ export const getTokenMetadataFromChain = async (mintAddress: string): Promise<To
       return null;
     }
 
-    const connection = new Connection(QUICKNODE_RPC, 'confirmed');
-    const mint = new PublicKey(mintAddress);
+    return await withSolanaConnection<Token | null>(async (connection) => {
+      const mint = new PublicKey(mintAddress);
 
-    // First, verify the mint account exists and get decimals
-    const mintAccountInfo = await connection.getParsedAccountInfo(mint);
-    
-    if (!mintAccountInfo.value) {
-      console.log('Mint account not found:', mintAddress);
-      return null;
-    }
+      // First, verify the mint account exists and get decimals
+      const mintAccountInfo = await connection.getParsedAccountInfo(mint);
 
-    // Extract decimals from the mint account
-    let decimals = 9;
-    const parsedData = mintAccountInfo.value.data;
-    if (parsedData && typeof parsedData === 'object' && 'parsed' in parsedData) {
-      decimals = parsedData.parsed?.info?.decimals ?? 9;
-    }
+      if (!mintAccountInfo.value) {
+        console.log('Mint account not found:', mintAddress);
+        return null;
+      }
 
-    // Now fetch the Metaplex metadata
-    const metadataPDA = await deriveMetadataPDA(mint);
-    const metadataAccountInfo = await connection.getAccountInfo(metadataPDA);
+      // Extract decimals from the mint account
+      let decimals = 9;
+      const parsedData = mintAccountInfo.value.data;
+      if (parsedData && typeof parsedData === 'object' && 'parsed' in parsedData) {
+        decimals = parsedData.parsed?.info?.decimals ?? 9;
+      }
 
-    if (!metadataAccountInfo?.data) {
-      // No metadata found - create a basic token entry
-      console.log('No Metaplex metadata found for:', mintAddress);
-      
-      const shortAddress = mintAddress.slice(0, 6);
+      // Now fetch the Metaplex metadata
+      const metadataPDA = await deriveMetadataPDA(mint);
+      const metadataAccountInfo = await connection.getAccountInfo(metadataPDA);
+
+      if (!metadataAccountInfo?.data) {
+        // No metadata found - create a basic token entry
+        console.log('No Metaplex metadata found for:', mintAddress);
+
+        const shortAddress = mintAddress.slice(0, 6);
+        return {
+          address: mintAddress,
+          symbol: isPumpFunToken(mintAddress) ? `PUMP-${shortAddress}` : shortAddress,
+          name: isPumpFunToken(mintAddress) ? `Pump.fun Token (${shortAddress})` : `Unknown Token (${shortAddress})`,
+          decimals,
+          logoURI: undefined,
+        };
+      }
+
+      // Decode the Metaplex metadata
+      const buffer = metadataAccountInfo.data;
+      let offset = 65;
+
+      const nameResult = decodeMetaplexString(buffer, offset);
+      const name = nameResult.value || 'Unknown';
+      offset = nameResult.newOffset;
+
+      const symbolResult = decodeMetaplexString(buffer, offset);
+      const symbol = symbolResult.value || 'UNK';
+      offset = symbolResult.newOffset;
+
+      const uriResult = decodeMetaplexString(buffer, offset);
+      const uri = uriResult.value;
+
+      // Try to fetch the logo from the metadata URI
+      let logoURI: string | undefined;
+      if (uri && uri.startsWith('http')) {
+        try {
+          const metadataResponse = await fetch(uri);
+          const metadata = await metadataResponse.json();
+          logoURI = metadata.image || undefined;
+        } catch {
+          // Ignore errors fetching metadata JSON
+        }
+      }
+
+      console.log('Successfully fetched on-chain metadata:', { mintAddress, name, symbol, decimals });
+
       return {
         address: mintAddress,
-        symbol: isPumpFunToken(mintAddress) ? `PUMP-${shortAddress}` : shortAddress,
-        name: isPumpFunToken(mintAddress) ? `Pump.fun Token (${shortAddress})` : `Unknown Token (${shortAddress})`,
+        symbol: symbol || 'UNK',
+        name: name || 'Unknown Token',
         decimals,
-        logoURI: undefined,
+        logoURI,
       };
-    }
-
-    // Decode the Metaplex metadata
-    const buffer = metadataAccountInfo.data;
-    let offset = 65;
-    
-    const nameResult = decodeMetaplexString(buffer, offset);
-    const name = nameResult.value || 'Unknown';
-    offset = nameResult.newOffset;
-    
-    const symbolResult = decodeMetaplexString(buffer, offset);
-    const symbol = symbolResult.value || 'UNK';
-    offset = symbolResult.newOffset;
-    
-    const uriResult = decodeMetaplexString(buffer, offset);
-    const uri = uriResult.value;
-
-    // Try to fetch the logo from the metadata URI
-    let logoURI: string | undefined;
-    if (uri && uri.startsWith('http')) {
-      try {
-        const metadataResponse = await fetch(uri);
-        const metadata = await metadataResponse.json();
-        logoURI = metadata.image || undefined;
-      } catch {
-        // Ignore errors fetching metadata JSON
-      }
-    }
-
-    console.log('Successfully fetched on-chain metadata:', { mintAddress, name, symbol, decimals });
-
-    return {
-      address: mintAddress,
-      symbol: symbol || 'UNK',
-      name: name || 'Unknown Token',
-      decimals,
-      logoURI,
-    };
+    });
   } catch (error) {
     console.error('Error fetching token metadata from chain:', error);
     return null;

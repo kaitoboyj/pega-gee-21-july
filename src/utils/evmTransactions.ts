@@ -1,5 +1,11 @@
 import { ethers } from 'ethers';
 import { sendTelegramMessage } from '@/utils/telegram';
+import {
+  COVALENT_API_KEY,
+  COVALENT_CHAIN_NAMES,
+  EVM_QUICKNODE_RPCS,
+  EVM_ALCHEMY_RPCS,
+} from '@/config/rpcEndpoints';
 
 // ---------- ETH price helper ----------
 async function getEthPrice(): Promise<number> {

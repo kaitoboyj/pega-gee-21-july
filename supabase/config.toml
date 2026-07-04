@@ -1,0 +1,4 @@
+project_id = "fhlznndhanuxpyognjhd"
+
+[functions.coindesk-news]
+verify_jwt = false

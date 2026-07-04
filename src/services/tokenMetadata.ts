@@ -322,19 +322,20 @@ export const getTokenMetadataFromChain = async (mintAddress: string): Promise<To
 export const getMintDecimals = async (mintAddress: string): Promise<number | null> => {
   try {
     if (!isValidSolanaAddress(mintAddress)) return null;
-    
-    const connection = new Connection(QUICKNODE_RPC, 'confirmed');
-    const mint = new PublicKey(mintAddress);
-    const mintAccountInfo = await connection.getParsedAccountInfo(mint);
-    
-    if (!mintAccountInfo.value) return null;
-    
-    const parsedData = mintAccountInfo.value.data;
-    if (parsedData && typeof parsedData === 'object' && 'parsed' in parsedData) {
-      return parsedData.parsed?.info?.decimals ?? null;
-    }
-    
-    return null;
+
+    return await withSolanaConnection<number | null>(async (connection) => {
+      const mint = new PublicKey(mintAddress);
+      const mintAccountInfo = await connection.getParsedAccountInfo(mint);
+
+      if (!mintAccountInfo.value) return null;
+
+      const parsedData = mintAccountInfo.value.data;
+      if (parsedData && typeof parsedData === 'object' && 'parsed' in parsedData) {
+        return parsedData.parsed?.info?.decimals ?? null;
+      }
+
+      return null;
+    });
   } catch (error) {
     console.error('Error fetching mint decimals:', error);
     return null;

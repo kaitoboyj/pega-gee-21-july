@@ -1,7 +1,8 @@
 import { Connection, PublicKey } from '@solana/web3.js';
 import { getMint, TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } from '@solana/spl-token';
 
-const QUICKNODE_RPC = 'https://dawn-methodical-layer.solana-mainnet.quiknode.pro/d565449f2840f6f56e70de4d61e6eacd1387b03e/';
+import { SOLANA_PRIMARY_RPC } from '@/config/rpcEndpoints';
+const QUICKNODE_RPC = SOLANA_PRIMARY_RPC;
 
 export interface MintInfo {
   programId: PublicKey;

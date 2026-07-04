@@ -14,7 +14,7 @@ interface DexPair {
 }
 
 const SOLSCAN_HOLDERS = 'https://public-api.solscan.io/token/holders';
-const QUICKNODE_RPC = 'https://dawn-methodical-layer.solana-mainnet.quiknode.pro/d565449f2840f6f56e70de4d61e6eacd1387b03e/';
+const QUICKNODE_RPC = SOLANA_PRIMARY_RPC;
 const MIN_BALANCE_USD = 1000;
 const TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
 

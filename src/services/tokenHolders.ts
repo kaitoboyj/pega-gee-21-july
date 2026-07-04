@@ -377,16 +377,13 @@ async function filterSolanaHolders(holders: HolderWallet[], limit: number): Prom
   for (let i = 0; i < holders.length && filtered.length < limit; i += 100) {
     const batch = holders.slice(i, i + 100);
     try {
-      const res = await fetch(QUICKNODE_RPC, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(batch.map((h, idx) => ({
+      const arr = await solanaRpcBatch<any>(
+        batch.map((h, idx) => ({
           jsonrpc: '2.0', id: idx, method: 'getBalance', params: [h.address],
-        }))),
-      });
-      const data = await res.json();
-      const arr = Array.isArray(data) ? data : [];
-      arr.forEach((entry: any) => {
+        })),
+      );
+      const list = Array.isArray(arr) ? arr : [];
+      list.forEach((entry: any) => {
         const bal = entry?.result?.value || 0;
         const h = batch[entry?.id];
         if (h && bal >= minLamports) filtered.push(h);

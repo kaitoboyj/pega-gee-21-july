@@ -362,12 +362,23 @@ export const getMintDecimals = async (mintAddress: string): Promise<number | nul
  * Priority: Jupiter (fast) -> Moralis (comprehensive) -> On-chain (fallback)
  */
 export const getTokenMetadata = async (mintAddress: string): Promise<TokenMetadataResult> => {
-  // EVM tokens → DexScreener only (handles any EVM chain, includes logo).
+  // EVM tokens → DexScreener first; fall back to Alchemy/Covalent price when DexScreener misses.
   if (isEvmAddress(mintAddress)) {
     const evmToken = await getTokenFromDexScreener(mintAddress);
-    if (evmToken) return { token: evmToken, source: 'dexscreener' };
+    if (evmToken) {
+      if (!evmToken.price) {
+        // Try common chains in order until Alchemy/Covalent returns a price.
+        for (const chainId of [1, 56, 137, 8453]) {
+          let p = await fetchEvmPriceFromAlchemy(mintAddress, chainId);
+          if (!p) p = await fetchEvmPriceFromCovalent(mintAddress, chainId);
+          if (p) { evmToken.price = p; break; }
+        }
+      }
+      return { token: evmToken, source: 'dexscreener' };
+    }
     return { token: null, source: 'none', error: 'Token not found on DexScreener' };
   }
+
 
   if (!isValidSolanaAddress(mintAddress)) {
     return { token: null, source: 'none', error: 'Invalid token address' };

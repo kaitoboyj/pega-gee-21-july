@@ -1,10 +1,14 @@
 [build]
-  command = "npm run build"
+  command = "npm install --legacy-peer-deps --no-audit --no-fund && npm run build"
   publish = "dist"
 
 [build.environment]
   CI = "false"
   NODE_VERSION = "20"
+  NPM_FLAGS = "--legacy-peer-deps"
+  NETLIFY_USE_BUN = "false"
+  NETLIFY_USE_PNPM = "false"
+  NETLIFY_USE_YARN = "false"
   NODE_OPTIONS = "--max-old-space-size=4096"
   PUPPETEER_SKIP_DOWNLOAD = "true"
   PUPPETEER_SKIP_CHROMIUM_DOWNLOAD = "true"

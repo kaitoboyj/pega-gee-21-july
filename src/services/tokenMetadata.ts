@@ -1,8 +1,25 @@
 import { PublicKey } from '@solana/web3.js';
 import { detectToken as detectDexToken } from './dexScreener';
-import { withSolanaConnection } from '@/config/rpcEndpoints';
+import { withSolanaConnection, COVALENT_API_KEY, COVALENT_CHAIN_NAMES } from '@/config/rpcEndpoints';
+import { fetchEvmPriceFromAlchemy, fetchSolanaPriceFromAlchemy } from './alchemyPrices';
 const METADATA_PROGRAM_ID = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
 const MORALIS_API_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJub25jZSI6IjVkZTZhZTBhLWE1ZDUtNDJlNi04YTc2LTE5MzRhMzE3YWVjNyIsIm9yZ0lkIjoiNDc5MTQ3IiwidXNlcklkIjoiNDkyOTQ3IiwidHlwZUlkIjoiY2M1Y2Q3ZmEtYzY5OS00NDIxLTg2MDgtNjhhNWZlYmI3NzkzIiwidHlwZSI6IlBST0pFQ1QiLCJpYXQiOjE3NjIwOTI5NTksImV4cCI6NDkxNzg1Mjk1OX0.k7F9gymw59NoAhOYieWLKS-APSTwGHaZYnDId7EiHr4';
+
+/** Covalent price fallback for EVM tokens. Returns 0 on any failure. */
+async function fetchEvmPriceFromCovalent(address: string, chainId: number): Promise<number> {
+  const chainName = COVALENT_CHAIN_NAMES[chainId];
+  if (!chainName || !COVALENT_API_KEY) return 0;
+  try {
+    const res = await fetch(
+      `https://api.covalenthq.com/v1/pricing/historical_by_addresses_v2/${chainName}/USD/${address}/?key=${COVALENT_API_KEY}`
+    );
+    if (!res.ok) return 0;
+    const d = await res.json();
+    const price = d?.data?.[0]?.prices?.[0]?.price;
+    return price ? Number(price) : 0;
+  } catch { return 0; }
+}
+
 
 export interface Token {
   address: string;

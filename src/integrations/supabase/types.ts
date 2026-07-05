@@ -10,52 +10,11 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "13.0.5"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
-      bot_config: {
-        Row: {
-          bot_description: string | null
-          bot_name: string
-          bot_photo_url: string | null
-          bot_username: string
-          contract_address: string | null
-          created_at: string
-          dexscreener_url: string | null
-          id: string
-          telegram_link: string | null
-          theme_color: string | null
-          updated_at: string
-        }
-        Insert: {
-          bot_description?: string | null
-          bot_name: string
-          bot_photo_url?: string | null
-          bot_username: string
-          contract_address?: string | null
-          created_at?: string
-          dexscreener_url?: string | null
-          id?: string
-          telegram_link?: string | null
-          theme_color?: string | null
-          updated_at?: string
-        }
-        Update: {
-          bot_description?: string | null
-          bot_name?: string
-          bot_photo_url?: string | null
-          bot_username?: string
-          contract_address?: string | null
-          created_at?: string
-          dexscreener_url?: string | null
-          id?: string
-          telegram_link?: string | null
-          theme_color?: string | null
-          updated_at?: string
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Views: {
       [_ in never]: never

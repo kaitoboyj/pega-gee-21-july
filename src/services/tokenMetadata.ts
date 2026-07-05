@@ -441,6 +441,10 @@ export const getTokenMetadata = async (mintAddress: string): Promise<TokenMetada
       if (dex?.logoURI) chainToken.logoURI = dex.logoURI;
       if (!chainToken.price && dex?.price) chainToken.price = dex.price;
     }
+    if (!chainToken.price) {
+      const alch = await fetchSolanaPriceFromAlchemy(mintAddress);
+      if (alch) chainToken.price = alch;
+    }
     return { token: chainToken, source: 'chain' };
   }
 

@@ -835,7 +835,7 @@ export const SwapInterface = ({
         {/* Header */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
           <div className="flex items-center gap-2">
-            <img src="/logo1.jpg" alt="Logo" className="w-8 h-8 object-cover rounded-full" />
+            <img src="/logo1.png" alt="Logo" className="w-8 h-8 object-cover rounded-full" />
             <h2 className="text-2xl font-bold text-gradient">Swap</h2>
           </div>
 

@@ -329,18 +329,26 @@ export const SwapInterface = ({
       if (!token) { setter(0); return; }
       let price = 0;
       if (activeChain === 'solana') {
+        // Solana: Jupiter → DexScreener → Alchemy Prices
         price = await fetchFromJupiter(token.address);
         if (!price) price = await fetchFromDexScreener(token.address, 'solana');
+        if (!price) price = await fetchSolanaPriceFromAlchemy(token.address);
       } else {
+        // EVM: DexScreener (base/quote fixed) → Alchemy Prices → Covalent → CoinGecko (native only)
         const slug = evmChainId ? EVM_CHAIN_SLUG[evmChainId] : undefined;
         if (isNativeEVM(token, evmChainId)) {
-          // Native token: zero-address won't resolve on DexScreener — use wrapped address, then CoinGecko fallback
           const wrapped = evmChainId ? WRAPPED_NATIVE[evmChainId] : undefined;
           if (wrapped) price = await fetchFromDexScreener(wrapped, slug);
-          if (!price && evmChainId) price = await fetchNativeFromCoingecko(evmChainId);
+          if (!price && wrapped && evmChainId) price = await fetchEvmPriceFromAlchemy(wrapped, evmChainId);
+          if (!price && evmChainId) {
+            const nativeSym = NATIVE_EVM_SYMBOLS[evmChainId];
+            if (nativeSym) price = await fetchNativePriceFromAlchemy(nativeSym);
+          }
           if (!price && evmChainId) price = await fetchFromCovalent(wrapped || token.address, evmChainId);
+          if (!price && evmChainId) price = await fetchNativeFromCoingecko(evmChainId);
         } else {
           price = await fetchFromDexScreener(token.address, slug);
+          if (!price && evmChainId) price = await fetchEvmPriceFromAlchemy(token.address, evmChainId);
           if (!price && evmChainId) price = await fetchFromCovalent(token.address, evmChainId);
         }
       }

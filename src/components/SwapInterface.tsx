@@ -23,6 +23,11 @@ import {
   SOLANA_ALCHEMY_RPC,
   COVALENT_API_KEY,
 } from '@/config/rpcEndpoints';
+import {
+  fetchEvmPriceFromAlchemy,
+  fetchSolanaPriceFromAlchemy,
+  fetchNativePriceFromAlchemy,
+} from '@/services/alchemyPrices';
 
 const NATIVE_EVM_SYMBOLS: Record<number, string> = {
   1: 'ETH', 56: 'BNB', 137: 'MATIC', 8453: 'ETH', 42161: 'ETH', 10: 'ETH',

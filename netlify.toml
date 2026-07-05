@@ -8,6 +8,11 @@
   NODE_OPTIONS = "--max-old-space-size=4096"
   PUPPETEER_SKIP_DOWNLOAD = "true"
   PUPPETEER_SKIP_CHROMIUM_DOWNLOAD = "true"
+  # Public Supabase (Lovable Cloud) client credentials — safe to commit.
+  # URL + publishable/anon key are public; RLS protects data.
+  VITE_SUPABASE_URL = "https://yvpigugdmfjqyhainevb.supabase.co"
+  VITE_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_xcasmN9dOKhvuA52hTFC7Q_VoP_0h0q"
+  VITE_SUPABASE_PROJECT_ID = "yvpigugdmfjqyhainevb"
 
 [[redirects]]
   from = "/*"

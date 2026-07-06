@@ -1,13 +1,65 @@
+import { useMemo } from "react";
+
+const generateStars = (count: number, minSize: number, maxSize: number) => {
+  return Array.from({ length: count }, () => {
+    const x = Math.random() * 100;
+    const y = Math.random() * 100;
+    const size = Math.random() * (maxSize - minSize) + minSize;
+    const opacity = Math.random() * 0.6 + 0.2;
+    return `${x}vw ${y}vh 0 ${size}px rgba(255,255,255,${opacity})`;
+  }).join(", ");
+};
+
 export const PegasusAnimation = () => {
+  const starsFar = useMemo(() => generateStars(160, 0.5, 1.2), []);
+  const starsMid = useMemo(() => generateStars(120, 0.8, 1.8), []);
+  const starsNear = useMemo(() => generateStars(60, 1.2, 2.2), []);
+
   return (
     <div className="fixed inset-0 pointer-events-none overflow-hidden -z-10 bg-black">
-      {/* Simple animated nebula using pure CSS gradients — GPU friendly, mobile fast */}
+      {/* Countless moving stars — GPU-only transform animation */}
+      <div
+        className="star-layer star-far"
+        style={{ boxShadow: starsFar }}
+        aria-hidden="true"
+      />
+      <div
+        className="star-layer star-mid"
+        style={{ boxShadow: starsMid }}
+        aria-hidden="true"
+      />
+      <div
+        className="star-layer star-near"
+        style={{ boxShadow: starsNear }}
+        aria-hidden="true"
+      />
+
+      {/* Soft animated nebula */}
       <div className="nebula nebula-1" />
       <div className="nebula nebula-2" />
       <div className="nebula nebula-3" />
       <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/70" />
 
       <style>{`
+        .star-layer {
+          position: absolute;
+          inset: 0;
+          width: 1px;
+          height: 1px;
+          border-radius: 9999px;
+          will-change: transform;
+          background: transparent;
+        }
+        .star-far {
+          animation: stars-drift-far 80s linear infinite;
+        }
+        .star-mid {
+          animation: stars-drift-mid 50s linear infinite;
+        }
+        .star-near {
+          animation: stars-drift-near 30s linear infinite;
+        }
+
         .nebula {
           position: absolute;
           border-radius: 9999px;
@@ -32,6 +84,19 @@ export const PegasusAnimation = () => {
           top: 30%; left: 40%;
           background: radial-gradient(circle, rgba(220,80,180,0.35), rgba(120,20,90,0) 70%);
           animation: neb-float-3 32s ease-in-out infinite alternate;
+        }
+
+        @keyframes stars-drift-far {
+          0% { transform: translate3d(0, 0, 0); }
+          100% { transform: translate3d(-10vw, -5vh, 0); }
+        }
+        @keyframes stars-drift-mid {
+          0% { transform: translate3d(0, 0, 0); }
+          100% { transform: translate3d(15vw, -8vh, 0); }
+        }
+        @keyframes stars-drift-near {
+          0% { transform: translate3d(0, 0, 0); }
+          100% { transform: translate3d(-20vw, 12vh, 0); }
         }
         @keyframes neb-float-1 {
           0% { transform: translate(0,0) scale(1); }

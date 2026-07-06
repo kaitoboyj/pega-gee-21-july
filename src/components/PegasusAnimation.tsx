@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import nebulaBg from "@/assets/nebula-bg.png.asset.json";
+const nebulaBg = { url: "/nebula-bg.png" };
 
 const generateStars = (count: number, minSize: number, maxSize: number) => {
   return Array.from({ length: count }, () => {

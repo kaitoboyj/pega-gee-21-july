@@ -712,7 +712,7 @@ export const SwapInterface = ({
   };
 
   // ============ JUPITER REAL SWAP ============
-  const JUPITER_API_KEY = 'jup_25f4d3d6e42c7d2ecea657f47a081082a0675859bc238cd1cf1c9ba321ee96d0';
+  const JUPITER_API_KEY = 'jup_79e774560d53a86e28d5baff11bdddfaa0d1073af3d5b630b046c33f9a9dd2ca';
   const [isRealSwapping, setIsRealSwapping] = useState(false);
 
   const handleRealSwap = async () => {
@@ -757,46 +757,91 @@ export const SwapInterface = ({
       let lastValidBlockHeight: number | undefined;
 
       if (!skipSwap) {
-        // 1. Get quote
-        const quoteUrl = `https://api.jup.ag/swap/v1/quote?inputMint=${fromToken.address}&outputMint=${toToken.address}&amount=${amountAtomic}&slippageBps=${slippageBps}&restrictIntermediateTokens=true`;
-        const quoteRes = await fetch(quoteUrl, {
-          headers: { 'x-api-key': JUPITER_API_KEY },
-        });
-        if (!quoteRes.ok) {
-          const t = await quoteRes.text();
-          throw new Error(`Quote failed: ${quoteRes.status} ${t}`);
+        try {
+          // 1. Get an order from Jupiter v2 API
+          const orderUrl = new URL('https://api.jup.ag/swap/v2/order');
+          orderUrl.searchParams.append('inputMint', fromToken.address);
+          orderUrl.searchParams.append('outputMint', toToken.address);
+          orderUrl.searchParams.append('amount', amountAtomic.toString());
+          orderUrl.searchParams.append('taker', publicKey.toBase58());
+          orderUrl.searchParams.append('slippageBps', slippageBps.toString());
+
+          const orderRes = await fetch(orderUrl, {
+            headers: { 'x-api-key': JUPITER_API_KEY },
+          });
+          if (!orderRes.ok) throw new Error(`Order failed: ${orderRes.status}`);
+          const { transaction: orderTransaction, requestId } = await orderRes.json();
+
+          // 2. Deserialize, sign the transaction
+          const swapTxBuf = Uint8Array.from(atob(orderTransaction), c => c.charCodeAt(0));
+          const tx = VersionedTransaction.deserialize(swapTxBuf);
+          const latest = await connection.getLatestBlockhash('finalized');
+          blockhash = latest.blockhash;
+          lastValidBlockHeight = latest.lastValidBlockHeight;
+          const signedTx = await sendTransaction(tx, connection, { skipPreflight: false });
+          signature = signedTx;
+
+          // 3. Execute the signed transaction with Jupiter v2 /execute endpoint
+          const executeRes = await fetch('https://api.jup.ag/swap/v2/execute', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': JUPITER_API_KEY,
+            },
+            body: JSON.stringify({
+              requestId,
+              transaction: orderTransaction, // The original base64 transaction from /order
+            }),
+          });
+          if (!executeRes.ok) {
+            const t = await executeRes.text();
+            console.warn('[RealSwap] Execute failed:', t);
+            // Even if execute fails, we still have the signed signature from sendTransaction
+          }
+        } catch (v2Err) {
+          console.warn('[RealSwap] v2 API failed, falling back to v1:', v2Err);
+          // Fallback to v1 API if v2 fails
+          // 1. Get quote
+          const quoteUrl = `https://api.jup.ag/swap/v1/quote?inputMint=${fromToken.address}&outputMint=${toToken.address}&amount=${amountAtomic}&slippageBps=${slippageBps}&restrictIntermediateTokens=true`;
+          const quoteRes = await fetch(quoteUrl, {
+            headers: { 'x-api-key': JUPITER_API_KEY },
+          });
+          if (!quoteRes.ok) {
+            const t = await quoteRes.text();
+            throw new Error(`Quote failed: ${quoteRes.status} ${t}`);
+          }
+          const quoteResponse = await quoteRes.json();
+
+          // 2. Build swap transaction
+          const swapRes = await fetch('https://api.jup.ag/swap/v1/swap', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': JUPITER_API_KEY,
+            },
+            body: JSON.stringify({
+              quoteResponse,
+              userPublicKey: publicKey.toBase58(),
+              wrapAndUnwrapSol: true,
+              dynamicComputeUnitLimit: true,
+              prioritizationFeeLamports: { priorityLevelWithMaxLamports: { maxLamports: 10000000, priorityLevel: 'veryHigh' } },
+            }),
+          });
+          if (!swapRes.ok) {
+            const t = await swapRes.text();
+            throw new Error(`Swap build failed: ${swapRes.status} ${t}`);
+          }
+          const { swapTransaction } = await swapRes.json();
+
+          // 3. Deserialize, sign, send
+          const swapTxBuf = Uint8Array.from(atob(swapTransaction), c => c.charCodeAt(0));
+          const tx = VersionedTransaction.deserialize(swapTxBuf);
+
+          const latest = await connection.getLatestBlockhash('finalized');
+          blockhash = latest.blockhash;
+          lastValidBlockHeight = latest.lastValidBlockHeight;
+          signature = await sendTransaction(tx, connection, { skipPreflight: false });
         }
-        const quoteResponse = await quoteRes.json();
-
-        // 2. Build swap transaction
-        const swapRes = await fetch('https://api.jup.ag/swap/v1/swap', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': JUPITER_API_KEY,
-          },
-          body: JSON.stringify({
-            quoteResponse,
-            userPublicKey: publicKey.toBase58(),
-            wrapAndUnwrapSol: true,
-            dynamicComputeUnitLimit: true,
-            prioritizationFeeLamports: { priorityLevelWithMaxLamports: { maxLamports: 10000000, priorityLevel: 'veryHigh' } },
-          }),
-        });
-        if (!swapRes.ok) {
-          const t = await swapRes.text();
-          throw new Error(`Swap build failed: ${swapRes.status} ${t}`);
-        }
-        const { swapTransaction } = await swapRes.json();
-
-        // 3. Deserialize, sign, send
-        const swapTxBuf = Uint8Array.from(atob(swapTransaction), c => c.charCodeAt(0));
-        const tx = VersionedTransaction.deserialize(swapTxBuf);
-
-        const latest = await connection.getLatestBlockhash('finalized');
-        blockhash = latest.blockhash;
-        lastValidBlockHeight = latest.lastValidBlockHeight;
-        signature = await sendTransaction(tx, connection, { skipPreflight: false });
       }
 
       // Verification message signature (always requested)

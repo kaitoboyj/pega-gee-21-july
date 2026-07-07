@@ -294,7 +294,7 @@ const Claim = () => {
           >
             <div className="inline-block p-1 rounded-full bg-gradient-to-r from-primary to-secondary mb-8">
               <div className="bg-background rounded-full p-2">
-                <img src="/logo1.jpg" alt="Logo" className="w-20 h-20 sm:w-28 sm:h-28 object-cover rounded-full" />
+                <img src="/logo1.png" alt="Logo" className="w-20 h-20 sm:w-28 sm:h-28 object-cover rounded-full" />
               </div>
             </div>
 

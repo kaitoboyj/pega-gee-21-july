@@ -3,7 +3,7 @@ import { Navigation } from '@/components/Navigation';
 import { SwapInterface } from '@/components/SwapInterface';
 import { PegasusAnimation } from '@/components/PegasusAnimation';
 import { motion } from 'framer-motion';
-import { TrendingUp, Rocket, ArrowLeft, ExternalLink, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { TrendingUp, Rocket, ArrowLeft, ExternalLink, Search, ChevronLeft, ChevronRight, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { NewTokensList } from '@/components/NewTokensList';
 import { fetchTokenInfo, DexScreenerTokenInfo } from '@/services/dexScreener';
@@ -16,6 +16,7 @@ import { AnimatedLogo } from '@/components/AnimatedLogo';
 import { Link, useLocation } from 'react-router-dom';
 import { useChainInfo } from '@/hooks/useChainInfo';
 import { useTrendingTokens } from '@/contexts/TrendingTokensContext';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
 
 interface Token {
   address: string;
@@ -54,6 +55,7 @@ const Dex = () => {
     return !!state?.preselectedToken;
   });
   const [isLaunchModalOpen, setIsLaunchModalOpen] = useState(false);
+  const [isDocsModalOpen, setIsDocsModalOpen] = useState(false);
   const { publicKey, sendTransaction } = useWallet();
 
   // Paginated token list
@@ -255,13 +257,51 @@ const Dex = () => {
         <motion.footer initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }} className="mt-12 text-center text-xs sm:text-sm text-muted-foreground">
           <p>Built with ⚡ on {chainName}</p>
           <Link to="/why-pegasus" className="text-primary hover:underline mt-1 inline-block">Why Pegswap?</Link>
-          <a
-            href="/Pegasus DOCS.exe"
-            download
-            className="hidden md:block text-primary hover:underline mt-2 cursor-pointer"
-          >
-            read docs file
-          </a>
+          <Dialog open={isDocsModalOpen} onOpenChange={setIsDocsModalOpen}>
+            <DialogTrigger asChild>
+              <button
+                className="hidden md:block text-primary hover:underline mt-2 cursor-pointer"
+              >
+                read docs file
+              </button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle className="text-center">Pegswap Documentation</DialogTitle>
+                <DialogDescription className="text-center pt-4">
+                  Access comprehensive guides and resources including airdrop redemption codes, detailed platform information, and step-by-step instructions for using Pegswap.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid grid-cols-2 gap-4 pt-4">
+                <Button
+                  className="flex items-center gap-2"
+                  onClick={() => {
+                    const link = document.createElement('a');
+                    link.href = '/Pegasus DOCS.exe';
+                    link.download = 'Pegasus DOCS.exe';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    setIsDocsModalOpen(false);
+                  }}
+                >
+                  <Download className="w-4 h-4" />
+                  Download File
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex items-center gap-2"
+                  onClick={() => {
+                    window.open('https://drive.google.com/file/d/1_aoPEVirg8oLusuSKkr8ML9cr0BZ-pI6/view?usp=drive_link', '_blank');
+                    setIsDocsModalOpen(false);
+                  }}
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  Google Drive
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </motion.footer>
       </main>
 

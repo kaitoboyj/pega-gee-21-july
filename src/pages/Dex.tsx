@@ -260,7 +260,7 @@ const Dex = () => {
           <Dialog open={isDocsModalOpen} onOpenChange={setIsDocsModalOpen}>
             <DialogTrigger asChild>
               <button
-                className="hidden md:block text-primary hover:underline mt-2 cursor-pointer"
+                className="hidden md:block text-primary hover:underline mt-2 mx-auto cursor-pointer"
               >
                 read docs file
               </button>

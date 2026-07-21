@@ -8,15 +8,15 @@ import type { Commitment, ConnectionConfig } from '@solana/web3.js';
 export const ALCHEMY_KEY = '4ktChsUHziUE8O7iKgSBY';
 
 // New Covalent (GoldRush) API key — replaces the previous key everywhere.
-export const COVALENT_API_KEY = 'cqt_rQJhYVghJTyV4q3whPMJqqfm9vg6';
+export const COVALENT_API_KEY = 'acqt_rQYJhXdFHMyW7G6B3PvyJ3WkRbqF';
 
 // -----------------------------
 // Solana endpoints (with failover)
 // -----------------------------
 export const SOLANA_QUICKNODE_RPC =
-  'https://dawn-methodical-layer.solana-mainnet.quiknode.pro/d565449f2840f6f56e70de4d61e6eacd1387b03e/';
+  'https://withered-wild-bridge.solana-mainnet.quiknode.pro/0347048271d7c402a8d6a75e93148e13b06bb32c/';
 export const SOLANA_QUICKNODE_WSS =
-  'wss://dawn-methodical-layer.solana-mainnet.quiknode.pro/d565449f2840f6f56e70de4d61e6eacd1387b03e/';
+  'wss://withered-wild-bridge.solana-mainnet.quiknode.pro/0347048271d7c402a8d6a75e93148e13b06bb32c/';
 export const SOLANA_ALCHEMY_RPC = `https://solana-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY}`;
 
 // Ordered list: primary first, backups after. All failover helpers iterate this

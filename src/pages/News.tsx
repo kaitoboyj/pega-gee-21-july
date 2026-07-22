@@ -18,46 +18,6 @@ interface Item {
 
 const POLL_MS = 60_000; // refresh every minute
 
-// Fallback news data
-const FALLBACK_NEWS: Item[] = [
-  {
-    title: "Welcome to Pegasus News",
-    link: "https://www.coindesk.com/",
-    description: "Stay updated with the latest crypto news and market trends right here on Pegasus.",
-    pubDate: new Date().toISOString(),
-    image: "https://coresg-normal.trae.ai/api/v1/text_to_image?prompt=crypto%20blockchain%20news%20illustration&image_size=square_hd",
-    creator: "Pegasus Team",
-    categories: ["Crypto", "News"]
-  },
-  {
-    title: "Market Analysis: Bitcoin Trends",
-    link: "https://www.coindesk.com/bitcoin/",
-    description: "Latest analysis on Bitcoin price movements and market sentiment.",
-    pubDate: new Date(Date.now() - 3600000).toISOString(),
-    image: null,
-    creator: "Market Desk",
-    categories: ["Bitcoin", "Markets"]
-  },
-  {
-    title: "Ethereum 2.0 Developments",
-    link: "https://www.coindesk.com/ethereum/",
-    description: "Updates on Ethereum's scalability and staking developments.",
-    pubDate: new Date(Date.now() - 7200000).toISOString(),
-    image: null,
-    creator: "Tech Desk",
-    categories: ["Ethereum", "Tech"]
-  },
-  {
-    title: "DeFi Innovations",
-    link: "https://www.coindesk.com/defi/",
-    description: "New protocols and innovations in decentralized finance.",
-    pubDate: new Date(Date.now() - 10800000).toISOString(),
-    image: null,
-    creator: "DeFi Desk",
-    categories: ["DeFi", "Innovation"]
-  }
-];
-
 const timeAgo = (iso: string) => {
   const t = new Date(iso).getTime();
   if (!t) return '';
@@ -133,7 +93,7 @@ const FEEDS = [
 ];
 
 const News = () => {
-  const [items, setItems] = useState<Item[]>(FALLBACK_NEWS);
+  const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
@@ -150,24 +110,46 @@ const News = () => {
       if (!error && data?.items && data.items.length > 0) {
         fetchedItems = data.items;
       } else {
-        // Fallback: try direct RSS fetch
+        // Fallback: try RSS to JSON proxy (rss2json.com) to avoid CORS
         for (const url of FEEDS) {
           try {
-            const r = await fetch(url, {
-              headers: {
-                'User-Agent': 'Mozilla/5.0 (compatible; PegasusNewsBot/1.0)',
-                Accept: 'application/rss+xml, application/xml, text/xml',
-              },
-            });
+            const proxyUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(url)}`;
+            const r = await fetch(proxyUrl);
             if (!r.ok) continue;
-            const xml = await r.text();
-            const items = parseRss(xml);
-            if (items.length > 0) {
-              fetchedItems = items;
+            const jsonData = await r.json();
+            if (jsonData.items && jsonData.items.length > 0) {
+              // Convert rss2json format to our Item format
+              fetchedItems = jsonData.items.map((item: any) => ({
+                title: item.title,
+                link: item.link,
+                description: stripHtml(item.description).slice(0, 300),
+                pubDate: item.pubDate,
+                image: item.thumbnail || item.enclosure?.link || null,
+                creator: item.author || null,
+                categories: item.categories || []
+              }));
               break;
             }
           } catch (e) {
-            console.error('Direct feed fetch failed', url, e);
+            console.error('Proxy feed fetch failed', url, e);
+            // If proxy fails, try direct fetch as last resort
+            try {
+              const r = await fetch(url, {
+                headers: {
+                  'User-Agent': 'Mozilla/5.0 (compatible; PegasusNewsBot/1.0)',
+                  Accept: 'application/rss+xml, application/xml, text/xml',
+                },
+              });
+              if (!r.ok) continue;
+              const xml = await r.text();
+              const items = parseRss(xml);
+              if (items.length > 0) {
+                fetchedItems = items;
+                break;
+              }
+            } catch (e2) {
+              console.error('Direct feed fetch also failed', url, e2);
+            }
           }
         }
       }
@@ -185,10 +167,6 @@ const News = () => {
         );
       });
       setLastUpdate(new Date());
-      setError(null);
-    } else {
-      // Use fallback data if nothing else works
-      setItems(FALLBACK_NEWS);
       setError(null);
     }
     
